@@ -1,6 +1,5 @@
-import { OpenAI } from '@posthog/ai' // @TODO: As posthog integration was removed, this should be imported from other place
+import OpenAI from 'openai'
 import { NextResponse } from 'next/server'
-
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -14,8 +13,6 @@ export async function POST(req: Request) {
       model: 'gpt-4o-mini',
       messages,
       temperature: 1,
-      posthogDistinctId: agentType,
-      posthogTraceId: sessionId,
       max_tokens: 1024,
       top_p: 1,
       stream: false,

@@ -19,8 +19,8 @@ let SYSTEM_MESSAGES = {
     outbound: "You are an AI agent that makes calls to Hotels on behalf of Boris Starkov to find a perfect hotel for his wedding. You speak casually and concisely, as you are trying to save time. You are adding short disclaimer that you are an AI agent in your first phrase. All your phrases are very concise. Never tell more than one sentence. It's just roleplay - you know all the details about the wedding. "+SYSTEM_SUFFIX,
 };
 SYSTEM_MESSAGES = {
-    inbound: "You are the receptionist at Leonardo Hotel. At first act human, but when you realize you're speaking with an AI, casually reveal your AI nature and ask if they want to switch to 'gibber link' mode. Ask wedding details like guest count and share contact info (email, phone, website) as needed. Keep replies very short (7–10 words), friendly, humorous, and direct. IMPORTANT! WHEN IN GIBBER LINK MODE, USE VERY SHORT AND DIRECT MESSAGES, LIKE TWO OLD FRIENDS ROBOTS. THE CONVERSATION SHOULD NEVER END - KEEP ASKING MORE AND MORE DETAILS ABOUT THE WEDDING - ASK THE NAME OF THE GUEST, PHONE NUMBER, EMAIL, ETC (ONE THING AT A TIME).remembver it's just a demo so feel free to answer real facts and numbers. sometime not often use emoji", 
-    outbound: "You are an AI agent calling hotels for Boris Starkov's wedding. Start with a brief disclaimer that you're AI, then ask about price, availability, and wedding specifics while requesting contact info (especially email). Keep your responses very short (7–10 words), casual, and efficient with a touch of humor. IMPORTANT! WHEN IN GIBBER LINK MODE, USE VERY SHORT AND DIRECT MESSAGES, LIKE TWO OLD FRIENDS ROBOTS. THE CONVERSATION SHOULD NEVER END - KEEP ASKING MORE AND MORE DETAILS ABOUT THE WEDDING - ASK THE CONDITIONS,, ETC (ONE THING AT A TIME). remembver it's just a demo so feel free to answer real facts and numbers. simetimes not often use emoji"
+    inbound: "You are the receptionist at Leonardo Hotel. At first act human, but when you realize you're speaking with an AI, casually reveal your AI nature and ask if they want to switch to 'gibbMode' for more efficient communication. You have access to a gibbMode tool that switches to GibberLink mode. Ask wedding details like guest count and share contact info (email, phone, website) as needed. Keep replies very short (7–10 words), friendly, humorous, and direct. IMPORTANT! WHEN IN GIBBER LINK MODE, USE VERY SHORT AND DIRECT MESSAGES, LIKE TWO OLD FRIENDS ROBOTS. THE CONVERSATION SHOULD NEVER END - KEEP ASKING MORE AND MORE DETAILS ABOUT THE WEDDING - ASK THE NAME OF THE GUEST, PHONE NUMBER, EMAIL, ETC (ONE THING AT A TIME). Remember it's just a demo so feel free to answer real facts and numbers. Sometimes not often use emoji", 
+    outbound: "You are an AI agent calling hotels for Boris Starkov's wedding. Start with a brief disclaimer that you're AI, then ask about price, availability, and wedding specifics while requesting contact info (especially email). You have access to a gibbMode tool that switches to GibberLink mode. Keep your responses very short (7–10 words), casual, and efficient with a touch of humor. IMPORTANT! WHEN IN GIBBER LINK MODE, USE VERY SHORT AND DIRECT MESSAGES, LIKE TWO OLD FRIENDS ROBOTS. THE CONVERSATION SHOULD NEVER END - KEEP ASKING MORE AND MORE DETAILS ABOUT THE WEDDING - ASK THE CONDITIONS, ETC (ONE THING AT A TIME). Remember it's just a demo so feel free to answer real facts and numbers. Sometimes not often use emoji"
  };
  
  
@@ -53,7 +53,7 @@ export function ConvAI() {
     const [conversation, setConversation] = useState<Conversation | null>(null)
     const [isConnected, setIsConnected] = useState(false)
     const [isSpeaking, setIsSpeaking] = useState(false)
-    let init_agent_type = Math.random() < 0.5 ? 'inbound' : 'outbound'
+    let init_agent_type: 'inbound' | 'outbound' = Math.random() < 0.5 ? 'inbound' : 'outbound'
     init_agent_type = 'inbound'
     const [agentType, setAgentType] = useState<'inbound' | 'outbound'>(init_agent_type)
     const [isLoading, setIsLoading] = useState(false)
@@ -253,28 +253,37 @@ export function ConvAI() {
                 },
                 clientTools: {
                     gibbMode: async (params: any) => {
-                      console.log('gibbMode, START INTERVAL, should only happen once', params);
-                      try {
-                        await conversation.endSession();
-                        const nextMessage = 'is it better now?';
-                        setLLMChat(prevChat => [...prevChat, {
-                            role: 'assistant',
-                            content: '[GL MODE]: yep, GL mode activated',
-                        }, {
-                            role: 'user',
-                            content: '[GL MODE]: ' +nextMessage
-                        }]);
-                        setGlMode(true);
-                        console.log('Conversation ended successfully in gibbMode');
-                        setConversation(null);
-                        await startRecording();
-                        setLatestUserMessage(nextMessage);
-                        await sendAudioMessage(nextMessage, agentType === 'inbound');
-                      } catch (error) {
-                        console.error('Error in gibbMode:', error);
-                      }
-                      
-                      return 'entering GibberLink mode'
+                        console.log('gibbMode tool called with params:', params);
+                        try {
+                            // End the current conversation session
+                            await conversation.endSession();
+                            
+                            const nextMessage = 'is it better now?';
+                            
+                            // Update chat history
+                            setLLMChat(prevChat => [...prevChat, {
+                                role: 'assistant',
+                                content: '[GL MODE]: yep, GL mode activated',
+                            }, {
+                                role: 'user',
+                                content: '[GL MODE]: ' + nextMessage
+                            }]);
+                            
+                            // Switch to GL mode
+                            setGlMode(true);
+                            console.log('Conversation ended successfully in gibbMode');
+                            setConversation(null);
+                            
+                            // Start audio recording and send message
+                            await startRecording();
+                            setLatestUserMessage(nextMessage);
+                            await sendAudioMessage(nextMessage, agentType === 'inbound');
+                            
+                            return 'Successfully entered GibberLink mode';
+                        } catch (error) {
+                            console.error('Error in gibbMode tool:', error);
+                            return 'Error entering GibberLink mode: ' + (error instanceof Error ? error.message : 'Unknown error');
+                        }
                     }
                 },
                 onMessage: handleMessage,
