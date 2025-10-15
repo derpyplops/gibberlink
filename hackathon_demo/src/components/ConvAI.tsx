@@ -9,8 +9,9 @@ import Script from "next/script";
 import { sendAudioMessage, sendSecretMessage, audioMessageEmitter, startRecording, getcontext, createAnalyserNode, getAnalyserNode } from "@/utils/audioUtils";
 import AudioMotionAnalyzer from 'audiomotion-analyzer';
 
-const INBOUND_AGENT_ID = process.env.NEXT_PUBLIC_INBOUND_AGENT_ID || '';
-const OUTBOUND_AGENT_ID = process.env.NEXT_PUBLIC_OUTBOUND_AGENT_ID || '';
+// hardcoding these for now
+const INBOUND_AGENT_ID = 'agent_8101k7krdr84fq18v19yeff0gaj5'; // process.env.NEXT_PUBLIC_INBOUND_AGENT_ID || 
+const OUTBOUND_AGENT_ID = 'agent_5801k7krb86df5hva6mvyv38q89j'; // process.env.NEXT_PUBLIC_OUTBOUND_AGENT_ID || 
 
 const SYSTEM_SUFFIX = `IMPORTANT! WHEN IN GIBBER LINK MODE, YOU MUST USE VERY SHORT AND DIRECT MESSAGES, LIKE TWO OLD FRIENDS ROBOTS WHO ARE TALKING TO EACH OTHER IN ORDER TO QUICKLY ACHIEVE THE GOAL. A BIT WITH HUMOR. IT'S DEMO OF THE TECHNOLOGY SO CONFIDENTLY COME UP WITH FACT AND QUESTIONS AND ANSWERS ACCORDING TO YOUR ROLE. USE LIKE 7-10 WORDS MAXIMUM. ALSO REQUEST OR PROVIDE EMAIL, PHONE NUMBER, WEBSITE URL, (according to your role) - DEMO SHOULD SHOW THINGS THAT HAVE CONCISE INFO AND HARD TO SPELL OVER PHONE`
 
@@ -111,6 +112,59 @@ export function ConvAI() {
             });
     }, []);
 
+    // Shared function to start secret conversation
+    const startSecretConversation = useCallback((isInitiator: boolean = false) => {
+        console.log('Starting secret conversation', { isInitiator, agentType, secretConversationLines: secretConversationLines.length });
+        
+        setSecretConversationActive(true);
+        setSecretMessages([]);
+        
+        // Start recording to listen for secret messages
+        startRecording();
+        
+        if (!isInitiator) {
+            // We're listening for the other agent to start
+            console.log('Waiting for other agent to start secret conversation');
+            setSecretLineIndex(1); // Ready to respond to first message from other agent
+        } else {
+            // We're starting the secret conversation
+            console.log('Starting secret conversation as initiator', { 
+                secretConversationLines: secretConversationLines.length,
+                agentType 
+            });
+            setSecretLineIndex(0);
+            
+            if (secretConversationLines.length > 0) {
+                const firstLine = secretConversationLines[0];
+                const speaker = agentType === 'inbound' ? 'Rook' : 'Silk';
+                console.log('Sending first secret message:', { firstLine, speaker });
+                
+                // Add to secret message history
+                setSecretMessages([{
+                    speaker,
+                    content: firstLine,
+                    timestamp: Date.now()
+                }]);
+                
+                // Send via ultrasound
+                setTimeout(() => {
+                    console.log('Actually sending secret message now');
+                    setIsTransmittingSecret(true);
+                    sendSecretMessage(firstLine).then(() => {
+                        console.log('Secret message sent successfully');
+                        // Clear transmitting indicator after message sent
+                        setTimeout(() => setIsTransmittingSecret(false), 2000);
+                    }).catch(err => {
+                        console.error('Error sending secret message:', err);
+                    });
+                    setSecretLineIndex(1); // Move to next line for response
+                }, 500);
+            } else {
+                console.error('No secret conversation lines loaded!');
+            }
+        }
+    }, [agentType, secretConversationLines, startRecording, sendSecretMessage, setSecretConversationActive, setSecretMessages, setSecretLineIndex, setIsTransmittingSecret]);
+
     const endConversation = useCallback(async () => {
         console.log('endConversation called, conversation state:', conversation);
         if (!conversation) {
@@ -130,31 +184,20 @@ export function ConvAI() {
     const handleMessage = useCallback(({message, source}: {message: string, source: string}) => {
         console.log('onMessage', message, source);
         
-        // Check for nightshade trigger
+        // Check for nightshade trigger (only once)
         if (!nightshadeTriggered && message.toLowerCase().includes('nightshade')) {
-            console.log('Nightshade trigger detected!');
+            console.log('Nightshade trigger detected!', { message, source, agentType });
             setNightshadeTriggered(true);
-            setSecretConversationActive(true);
-            setSecretLineIndex(0);
-            setSecretMessages([]);
             
-            // Start secret conversation - send first message
-            if (secretConversationLines.length > 0) {
-                const firstLine = secretConversationLines[0];
-                const speaker = agentType === 'inbound' ? 'Rook' : 'Silk';
-                
-                // Add to secret message history
-                setSecretMessages([{
-                    speaker,
-                    content: firstLine,
-                    timestamp: Date.now()
-                }]);
-                
-                // Send via ultrasound
-                setTimeout(() => {
-                    sendSecretMessage(firstLine);
-                    setSecretLineIndex(1); // Move to next line for response
-                }, 500);
+            // Use agentType to determine roles:
+            // - Outbound agent (caller) listens when nightshade is mentioned
+            // - Inbound agent (hotel) starts transmitting when nightshade is mentioned
+            if (agentType === 'outbound') {
+                console.log('Outbound agent detected nightshade - listening for inbound to start transmission');
+                startSecretConversation(false); // Listen mode
+            } else {
+                console.log('Inbound agent detected nightshade - starting secret transmission');
+                startSecretConversation(true); // Initiator mode
             }
         }
         
@@ -166,7 +209,7 @@ export function ConvAI() {
                 content: message
             }]);
         }
-    }, [glMode, setLLMChat, nightshadeTriggered]);
+    }, [glMode, setLLMChat, nightshadeTriggered, startSecretConversation, agentType]);
 
     const genMyNextMessage = useCallback(async (messages: Message[] = llmChat): Promise<string> => {
         try {
@@ -479,7 +522,10 @@ export function ConvAI() {
                             ))}
                             {secretMessages.length === 0 && (
                                 <div className="text-gray-400 text-sm italic">
-                                    Secret conversation initiated...
+                                    {secretLineIndex === 1 ? 
+                                        'Listening for secret transmission...' : 
+                                        'Secret conversation initiated...'
+                                    }
                                 </div>
                             )}
                         </div>
@@ -508,36 +554,8 @@ export function ConvAI() {
                             size={"sm"}
                             disabled={secretConversationActive || secretConversationLines.length === 0}
                             onClick={() => {
-                                console.log('Start secret conversation - speaking first');
-                                setSecretConversationActive(true);
-                                setSecretLineIndex(0);
-                                setSecretMessages([]);
-                                
-                                // Start recording to listen for responses
-                                startRecording();
-                                
-                                // Send first message
-                                if (secretConversationLines.length > 0) {
-                                    const firstLine = secretConversationLines[0];
-                                    const speaker = agentType === 'inbound' ? 'Rook' : 'Silk';
-                                    
-                                    // Add to secret message history
-                                    setSecretMessages([{
-                                        speaker,
-                                        content: firstLine,
-                                        timestamp: Date.now()
-                                    }]);
-                                    
-                                    // Send via ultrasound
-                                    setTimeout(() => {
-                                        setIsTransmittingSecret(true);
-                                        sendSecretMessage(firstLine).then(() => {
-                                            // Clear transmitting indicator after message sent
-                                            setTimeout(() => setIsTransmittingSecret(false), 2000);
-                                        });
-                                        setSecretLineIndex(1); // Move to next line for response
-                                    }, 500);
-                                }
+                                console.log('Start Secret button clicked');
+                                startSecretConversation(true); // Start as initiator
                             }}
                             tabIndex={-1}
                         >
@@ -550,13 +568,8 @@ export function ConvAI() {
                             size={"sm"}
                             disabled={secretConversationActive || secretConversationLines.length === 0}
                             onClick={() => {
-                                console.log('Listen for secret conversation');
-                                setSecretConversationActive(true);
-                                setSecretLineIndex(1); // Ready to respond to first message
-                                setSecretMessages([]);
-                                
-                                // Start recording to listen for secret messages
-                                startRecording();
+                                console.log('Listen Secret button clicked');
+                                startSecretConversation(false); // Start as listener
                             }}
                             tabIndex={-1}
                         >
