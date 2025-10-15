@@ -78,6 +78,8 @@ export function ConvAI() {
     const [secretMessages, setSecretMessages] = useState<SecretMessage[]>([]);
     const [secretConversationLines, setSecretConversationLines] = useState<string[]>([]);
     const [nightshadeTriggered, setNightshadeTriggered] = useState(false);
+    const [isTransmittingSecret, setIsTransmittingSecret] = useState(false);
+    const [isReceivingSecret, setIsReceivingSecret] = useState(false);
 
     if (false)
     useEffect(() => {
@@ -447,9 +449,25 @@ export function ConvAI() {
                 {/* Secret conversation sidebar */}
                 {secretConversationActive && (
                     <div className="fixed right-4 top-4 bottom-20 w-80 bg-black/80 border border-gray-600 rounded-lg p-4 backdrop-blur-sm z-20">
-                        <h3 className="text-white text-lg font-semibold mb-4 border-b border-gray-600 pb-2">
-                            Secret Channel
-                        </h3>
+                        <div className="flex items-center justify-between mb-4 border-b border-gray-600 pb-2">
+                            <h3 className="text-white text-lg font-semibold">
+                                Secret Channel
+                            </h3>
+                            <div className="flex items-center gap-2">
+                                {isTransmittingSecret && (
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                                        <span className="text-red-400 text-xs">TX</span>
+                                    </div>
+                                )}
+                                {isReceivingSecret && (
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                        <span className="text-green-400 text-xs">RX</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                         <div className="flex flex-col gap-2 h-full overflow-y-auto">
                             {secretMessages.map((msg, index) => (
                                 <div key={index} className={cn(
@@ -512,7 +530,11 @@ export function ConvAI() {
                                     
                                     // Send via ultrasound
                                     setTimeout(() => {
-                                        sendSecretMessage(firstLine);
+                                        setIsTransmittingSecret(true);
+                                        sendSecretMessage(firstLine).then(() => {
+                                            // Clear transmitting indicator after message sent
+                                            setTimeout(() => setIsTransmittingSecret(false), 2000);
+                                        });
                                         setSecretLineIndex(1); // Move to next line for response
                                     }, 500);
                                 }
@@ -539,6 +561,24 @@ export function ConvAI() {
                             tabIndex={-1}
                         >
                             Listen Secret
+                        </Button>
+                        
+                        {/* Test indicator button - for debugging */}
+                        <Button
+                            variant={'outline'}
+                            size={"sm"}
+                            onClick={() => {
+                                console.log('Testing indicators');
+                                setIsTransmittingSecret(true);
+                                setTimeout(() => {
+                                    setIsTransmittingSecret(false);
+                                    setIsReceivingSecret(true);
+                                    setTimeout(() => setIsReceivingSecret(false), 2000);
+                                }, 2000);
+                            }}
+                            tabIndex={-1}
+                        >
+                            Test TX/RX
                         </Button>
                     </div>
                 )}
