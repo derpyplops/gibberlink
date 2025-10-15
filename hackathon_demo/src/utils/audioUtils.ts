@@ -217,6 +217,7 @@ export async function sendAudioMessage(message: string, fastest:boolean = false)
       instance,
       msg,
       fastest ? ggwave.ProtocolId.GGWAVE_PROTOCOL_AUDIBLE_FASTEST : ggwave.ProtocolId.GGWAVE_PROTOCOL_AUDIBLE_FAST,
+      // GGWAVE_PROTOCOL_ULTRASOUND_NORMAL
       10
     );
 

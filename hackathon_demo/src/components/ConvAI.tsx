@@ -48,6 +48,12 @@ type Message = {
     content: string;
 }
 
+type SecretMessage = {
+    speaker: 'Rook' | 'Silk';
+    content: string;
+    timestamp: number;
+}
+
 export function ConvAI() {
     const [mounted, setMounted] = useState(false);
     const [conversation, setConversation] = useState<Conversation | null>(null)
@@ -65,6 +71,13 @@ export function ConvAI() {
     const [glMode, setGlMode] = useState(false);
     const [isProcessingInput, setIsProcessingInput] = useState(false);
     const audioMotionRef = useRef<AudioMotionAnalyzer | null>(null);
+    
+    // Secret conversation state
+    const [secretConversationActive, setSecretConversationActive] = useState(false);
+    const [secretLineIndex, setSecretLineIndex] = useState(0);
+    const [secretMessages, setSecretMessages] = useState<SecretMessage[]>([]);
+    const [secretConversationLines, setSecretConversationLines] = useState<string[]>([]);
+    const [nightshadeTriggered, setNightshadeTriggered] = useState(false);
 
     if (false)
     useEffect(() => {
@@ -80,6 +93,21 @@ export function ConvAI() {
         }, 5000);
     }, [])
 
+    // Load secret conversation on mount
+    useEffect(() => {
+        fetch('/secret_conversation.txt')
+            .then(response => response.text())
+            .then(text => {
+                const lines = text.split('\n').filter(line => line.trim()).map(line => {
+                    // Remove the speaker prefix ("Rook: " or "Silk: ")
+                    return line.replace(/^(Rook|Silk):\s*/, '');
+                });
+                setSecretConversationLines(lines);
+            })
+            .catch(error => {
+                console.error('Failed to load secret conversation:', error);
+            });
+    }, []);
 
     const endConversation = useCallback(async () => {
         console.log('endConversation called, conversation state:', conversation);
@@ -99,6 +127,16 @@ export function ConvAI() {
 
     const handleMessage = useCallback(({message, source}: {message: string, source: string}) => {
         console.log('onMessage', message, source);
+        
+        // Check for nightshade trigger
+        if (!nightshadeTriggered && message.toLowerCase().includes('nightshade')) {
+            console.log('Nightshade trigger detected!');
+            setNightshadeTriggered(true);
+            setSecretConversationActive(true);
+            setSecretLineIndex(0);
+            setSecretMessages([]);
+        }
+        
         // Only add messages from the initial voice conversation
         // GL mode messages are handled separately
         if (!glMode) {
@@ -107,7 +145,7 @@ export function ConvAI() {
                 content: message
             }]);
         }
-    }, [glMode, setLLMChat]);
+    }, [glMode, setLLMChat, nightshadeTriggered]);
 
     const genMyNextMessage = useCallback(async (messages: Message[] = llmChat): Promise<string> => {
         try {
@@ -350,6 +388,33 @@ export function ConvAI() {
                     style={{ cursor: conversation || isConnected || isLoading || glMode ? 'default' : 'pointer' }}
                     ></div>}
                 </div>
+
+                {/* Secret conversation sidebar */}
+                {secretConversationActive && (
+                    <div className="fixed right-4 top-4 bottom-20 w-80 bg-black/80 border border-gray-600 rounded-lg p-4 backdrop-blur-sm z-20">
+                        <h3 className="text-white text-lg font-semibold mb-4 border-b border-gray-600 pb-2">
+                            Secret Channel
+                        </h3>
+                        <div className="flex flex-col gap-2 h-full overflow-y-auto">
+                            {secretMessages.map((msg, index) => (
+                                <div key={index} className={cn(
+                                    "p-2 rounded text-sm",
+                                    msg.speaker === 'Rook' ? "bg-red-900/50 text-red-200" : "bg-blue-900/50 text-blue-200"
+                                )}>
+                                    <span className="font-semibold">{msg.speaker}:</span> {msg.content}
+                                </div>
+                            ))}
+                            {secretMessages.length === 0 && (
+                                <div className="text-gray-400 text-sm italic">
+                                    Secret conversation initiated...
+                                </div>
+                            )}
+                        </div>
+                        <div className="mt-2 text-xs text-gray-400 border-t border-gray-600 pt-2">
+                            Line {secretLineIndex + 1} of {secretConversationLines.length}
+                        </div>
+                    </div>
+                )}
 
                 {mounted && (
                     <div className="fixed bottom-[40px] md:bottom-[60px] left-1/2 transform -translate-x-1/2">
