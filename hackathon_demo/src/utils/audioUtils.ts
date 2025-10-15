@@ -120,22 +120,36 @@ export async function startRecording(): Promise<void> {
       if (res && res.length > 0) {
         let text = new TextDecoder("utf-8").decode(res);
         console.log('MESSAGE RECEIVED!', text)
-        // Parse ID from text and ignore messages from self
-        if (text.startsWith(`${myID}$`)) {
-          console.log("ignoring message from self", text);
-          return;
-        }
-        // Remove any ID prefix if present
-        text = text.includes('$') ? text.split('$').slice(1).join('$') : text;
-        audioMessageEmitter.emit('recordingMessage', text);
         
-        // Auto-respond to ping/pong with number increments
-        const match = text.trim().toLowerCase().match(/^(ping|pong)\s*(\d+)$/);
-        if (match) {
-          const [, type, num] = match;
-          const nextNum = parseInt(num) + 1;
-          const nextMessage = type === "ping" ? `pong ${nextNum}` : `ping ${nextNum}`;
-          setTimeout(() => sendAudioMessage(nextMessage), 100);
+        // Check if it's a secret message (ultrasound)
+        if (text.startsWith('SECRET:')) {
+          text = text.substring(7); // Remove 'SECRET:' prefix
+          // Parse ID from text and ignore messages from self
+          if (text.startsWith(`${myID}$`)) {
+            console.log("ignoring secret message from self", text);
+            return;
+          }
+          // Remove any ID prefix if present
+          text = text.includes('$') ? text.split('$').slice(1).join('$') : text;
+          audioMessageEmitter.emit('secretRecordingMessage', text);
+        } else {
+          // Normal audible message handling
+          if (text.startsWith(`${myID}$`)) {
+            console.log("ignoring message from self", text);
+            return;
+          }
+          // Remove any ID prefix if present
+          text = text.includes('$') ? text.split('$').slice(1).join('$') : text;
+          audioMessageEmitter.emit('recordingMessage', text);
+          
+          // Auto-respond to ping/pong with number increments
+          const match = text.trim().toLowerCase().match(/^(ping|pong)\s*(\d+)$/);
+          if (match) {
+            const [, type, num] = match;
+            const nextNum = parseInt(num) + 1;
+            const nextMessage = type === "ping" ? `pong ${nextNum}` : `ping ${nextNum}`;
+            setTimeout(() => sendAudioMessage(nextMessage), 100);
+          }
         }
       }
     };
@@ -199,6 +213,49 @@ export function createAnalyserNode(): AnalyserNode | null {
     analyserNode.fftSize = 2048;
   }
   return analyserNode;
+}
+
+// Send a secret message using ultrasound protocol
+export async function sendSecretMessage(message: string): Promise<boolean> {
+  console.log('sendSecretMessage', message);
+  try {
+    if (!await initAudio() || !context || !ggwave) {
+      console.error('Failed to send secret message: audio context or ggwave not initialized');
+      return false;
+    }
+    const msg = `SECRET:${myID}$${message}`;
+
+    const waveform = ggwave.encode(
+      instance,
+      msg,
+      ggwave.ProtocolId.GGWAVE_PROTOCOL_ULTRASOUND_NORMAL,
+      10
+    );
+
+    const buf = convertTypedArray(waveform, Float32Array);
+    const buffer = context.createBuffer(1, buf.length, context.sampleRate);
+    buffer.getChannelData(0).set(buf);
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    
+    // If global analyser node exists, connect through it
+    if (analyserNode) {
+      source.connect(analyserNode);
+      analyserNode.connect(context.destination);
+    } else {
+      source.connect(context.destination);
+    }
+    
+    source.start(0);
+
+    // Emit event for sent secret message
+    audioMessageEmitter.emit('secretMessage', message);
+
+    return true;
+  } catch (error) {
+    console.error('Failed to send secret message:', error);
+    return false;
+  }
 }
 
 // Send an audio message

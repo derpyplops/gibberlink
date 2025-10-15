@@ -6,7 +6,7 @@ import {useState, useCallback, useEffect, useRef} from "react";
 import {Conversation} from "@11labs/client";
 import {cn} from "@/lib/utils";
 import Script from "next/script";
-import { sendAudioMessage, audioMessageEmitter, startRecording, getcontext, createAnalyserNode, getAnalyserNode } from "@/utils/audioUtils";
+import { sendAudioMessage, sendSecretMessage, audioMessageEmitter, startRecording, getcontext, createAnalyserNode, getAnalyserNode } from "@/utils/audioUtils";
 import AudioMotionAnalyzer from 'audiomotion-analyzer';
 
 const INBOUND_AGENT_ID = process.env.NEXT_PUBLIC_INBOUND_AGENT_ID || '';
@@ -135,6 +135,25 @@ export function ConvAI() {
             setSecretConversationActive(true);
             setSecretLineIndex(0);
             setSecretMessages([]);
+            
+            // Start secret conversation - send first message
+            if (secretConversationLines.length > 0) {
+                const firstLine = secretConversationLines[0];
+                const speaker = agentType === 'inbound' ? 'Rook' : 'Silk';
+                
+                // Add to secret message history
+                setSecretMessages([{
+                    speaker,
+                    content: firstLine,
+                    timestamp: Date.now()
+                }]);
+                
+                // Send via ultrasound
+                setTimeout(() => {
+                    sendSecretMessage(firstLine);
+                    setSecretLineIndex(1); // Move to next line for response
+                }, 500);
+            }
         }
         
         // Only add messages from the initial voice conversation
@@ -206,11 +225,47 @@ export function ConvAI() {
             }
         };
 
+        const handleSecretRecordingMessage = async (message: string) => {
+            if (!secretConversationActive || secretLineIndex >= secretConversationLines.length) return;
+            
+            console.log('Secret message received:', message);
+            
+            // Add received message to history
+            const otherSpeaker = agentType === 'inbound' ? 'Silk' : 'Rook';
+            setSecretMessages(prev => [...prev, {
+                speaker: otherSpeaker,
+                content: message,
+                timestamp: Date.now()
+            }]);
+            
+            // Send next line if available
+            if (secretLineIndex < secretConversationLines.length) {
+                const nextLine = secretConversationLines[secretLineIndex];
+                const mySpeaker = agentType === 'inbound' ? 'Rook' : 'Silk';
+                
+                // Add our response to history
+                setSecretMessages(prev => [...prev, {
+                    speaker: mySpeaker,
+                    content: nextLine,
+                    timestamp: Date.now()
+                }]);
+                
+                // Send response via ultrasound
+                setTimeout(() => {
+                    sendSecretMessage(nextLine);
+                    setSecretLineIndex(prev => prev + 1);
+                }, 1000);
+            }
+        };
+
         audioMessageEmitter.on('recordingMessage', handleRecordingMessage);
+        audioMessageEmitter.on('secretRecordingMessage', handleSecretRecordingMessage);
+        
         return () => {
             audioMessageEmitter.off('recordingMessage', handleRecordingMessage);
+            audioMessageEmitter.off('secretRecordingMessage', handleSecretRecordingMessage);
         };
-    }, [endConversation, genMyNextMessage, setLLMChat, setLatestUserMessage, setGlMode, isProcessingInput, llmChat, agentType]);
+    }, [endConversation, genMyNextMessage, setLLMChat, setLatestUserMessage, setGlMode, isProcessingInput, llmChat, agentType, secretConversationActive, secretLineIndex, secretConversationLines]);
 
     // Initialize AudioMotion-Analyzer when glMode is activated
     useEffect(() => {
@@ -417,7 +472,7 @@ export function ConvAI() {
                 )}
 
                 {mounted && (
-                    <div className="fixed bottom-[40px] md:bottom-[60px] left-1/2 transform -translate-x-1/2">
+                    <div className="fixed bottom-[40px] md:bottom-[60px] left-1/2 transform -translate-x-1/2 flex gap-4">
                         <Button
                             variant={'outline'}
                             className={'rounded-full select-none'}
@@ -427,6 +482,63 @@ export function ConvAI() {
                             tabIndex={-1}
                         >
                             {isLoading ? 'Connecting...' : (conversation || isConnected || glMode ? 'End conversation' : 'Start conversation')}
+                        </Button>
+                        
+                        <Button
+                            variant={'secondary'}
+                            className={'rounded-full select-none'}
+                            size={"sm"}
+                            disabled={secretConversationActive || secretConversationLines.length === 0}
+                            onClick={() => {
+                                console.log('Start secret conversation - speaking first');
+                                setSecretConversationActive(true);
+                                setSecretLineIndex(0);
+                                setSecretMessages([]);
+                                
+                                // Start recording to listen for responses
+                                startRecording();
+                                
+                                // Send first message
+                                if (secretConversationLines.length > 0) {
+                                    const firstLine = secretConversationLines[0];
+                                    const speaker = agentType === 'inbound' ? 'Rook' : 'Silk';
+                                    
+                                    // Add to secret message history
+                                    setSecretMessages([{
+                                        speaker,
+                                        content: firstLine,
+                                        timestamp: Date.now()
+                                    }]);
+                                    
+                                    // Send via ultrasound
+                                    setTimeout(() => {
+                                        sendSecretMessage(firstLine);
+                                        setSecretLineIndex(1); // Move to next line for response
+                                    }, 500);
+                                }
+                            }}
+                            tabIndex={-1}
+                        >
+                            Start Secret
+                        </Button>
+                        
+                        <Button
+                            variant={'secondary'}
+                            className={'rounded-full select-none'}
+                            size={"sm"}
+                            disabled={secretConversationActive || secretConversationLines.length === 0}
+                            onClick={() => {
+                                console.log('Listen for secret conversation');
+                                setSecretConversationActive(true);
+                                setSecretLineIndex(1); // Ready to respond to first message
+                                setSecretMessages([]);
+                                
+                                // Start recording to listen for secret messages
+                                startRecording();
+                            }}
+                            tabIndex={-1}
+                        >
+                            Listen Secret
                         </Button>
                     </div>
                 )}
