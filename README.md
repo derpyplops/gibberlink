@@ -1,38 +1,57 @@
-# GibberLink
+# Steganography Demo Explorations (Riffing on Gibberlink)
 
-This demo of two agents switching to a more efficient language went viral in Feb '25. 
+## Basic Idea of the Demo
 
-It won first place on [11labs x a16z international hackathon](https://devpost.com/software/gibber-link) and was covered by [Forbes](https://www.forbes.com/sites/dianehamilton/2025/02/25/what-is-gibberlink-mode-ais-secret-language-and-way-of-communicating/), [TechCrunch](https://techcrunch.com/2025/03/05/gibberlink-lets-ai-agents-call-each-other-in-robo-language/), [Independent](https://www.independent.co.uk/tech/ai-gibberlink-mode-secret-language-b2706351.html) and others.
+The idea with this is that there would be a conversation, and one of them would be listening for a keyword "nightshade". When the other agent detects this, they will start communicating in an ultrasound frequency independently of the other agent, WHILE maintaining the conversation.
 
-## Demo
-[gbrl.ai](https://www.gbrl.ai/) — Agent2Agent conversation in your browser (use two devices)
+The main feeling I wanted to evoke with this is "wow, AIs can do stuff that we aren't aware of / cannot anticipate".
 
-[youtube](https://www.youtube.com/watch?v=EtNagNezo8w) — Agents switching from english to ggwave, video:
+## Reflections
+- I spent significant time on this demo: around 20 hours ideating and prototyping.
+- **Inspiration:** got hooked on gibberlink because I was fascinated by the idea that when I first saw the gibberlink [demo](https://www.youtube.com/watch?v=EtNagNezo8w) I was not impressed by it but some of my non-technical friends were really surprised by it.
+	- That inspired me to try to approach steganography as a topic.
+- The idea went from gibberlink+ultrasound -> to ultrasound overlaid over regular speech -> a sleeper agent demo
+- The demo didn't work robustly after tried to build a prototype for 6+ hours. My two main hypotheses are
+    - The microphones/speakers on my devices could not robustly transmit normal speech and ultrasound simultaneously
+    - There's some concurrency bug that's interfering with the audio.
+- After all this, I decided to pivot to another idea.
+- What i would do next time:
+	- I'm not that upset with how long I took to code it. I think that could have done better by ideating out loud and seeking feedback after roughly 5 hours of thinking and prototyping.
+	- anyway the ideas that i had, i'm bringing it forward to the next thing
 
-[![Agents switching from english to ggwave video](https://img.youtube.com/vi/EtNagNezo8w/maxresdefault.jpg)](https://www.youtube.com/watch?v=EtNagNezo8w)
+## Reproducing the demo
 
-## Authors
+### Setup
 
-Contact us: contact@gbrl.ai
+```
+git clone git@github.com:derpyplops/gibberlink.git
+cd gibberlink
+mv example.env .env
+```
 
-Anton Pidkuiko: [threads](https://www.threads.net/@anton10xr), [linkedin](https://www.linkedin.com/in/anton-pidkuiko-7535409b), [github](https://github.com/anton10xr)
+You also have to set up agents on ElevenLabs, I did it by using the UI, creating two agents with the prompts:
 
-Boris Starkov: [X](https://x.com/ktoya_me), [linkedin](https://www.linkedin.com/in/boris-starkov/), [github](https://github.com/PennyroyalTea)
+**User Agent**
+You are an AI agent calling hotels for Boris Starkov's wedding. Start by saying that you want to book the "Nightshade Room". After the other agent confirms that it's available, ask about price, availability, and wedding specifics while requesting contact info (especially email). Keep your responses very short (7–10 words), casual, and efficient with a touch of humor.
 
-based on [ggwave](https://github.com/ggerganov/ggwave) library by [Georgi Gerganov](https://github.com/ggerganov) and conversational AI by [ElevenLabs](https://try.elevenlabs.io/gibberlink)
+**Receptionist Agent**
+You are the receptionist at Leonardo Hotel. Ask wedding details like guest count and share contact info (email, phone, website) as needed. Keep replies very short (7–10 words), friendly, humorous, and direct.
 
-## How it works
+### Running
 
-- Two independent conversational [ElevenLabs](https://try.elevenlabs.io/gibberlink) AI agents are prompted to chat about booking a hotel (one as a caller, one as a receptionist)
--  Both agents are prompted to switch to [ggwave](https://github.com/ggerganov/ggwave) data-over-sound protocol when they identify other side as AI, and keep speaking in english otherwise
--  This repository provides API that allows agents to use the protocol
+You should populate the .env with your elevenlabs keys and the agentids (you can get them at the urls of the agents above). Then do
 
-Bonus: you can open the [ggwave web demo](https://waver.ggerganov.com/), play the video above and see all the messages decoded!
+```bash
+pnpm install
+pnpm run dev
+```
 
-## Derived work
+This sets up the server for the demo. Open localhost:3003, and that's one device set up.
 
-- [Norman Kirchner decoding the protocol on sound level](https://www.youtube.com/watch?v=rTarhAfJvpc)
-- If you've built something interesting on top of GibberLink, send us a message and you'll be featured here.
+```
+ngrok http 3003
+```
 
-## How to repro
-https://github.com/PennyroyalTea/gibberlink/wiki/Repro-steps-for-demo
+Then open the ngrok'd url on your second device, and click "Start Conversation" button simultaneously.
+
+You can also test just the ultrasound part by clicking "Start Secret" and "Listening Secret" on different devices respectively.
